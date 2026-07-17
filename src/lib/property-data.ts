@@ -57,6 +57,7 @@ export function databaseRowToProperty(row: Record<string, unknown>): Property {
     address: String(row.address),
     locality: String(row.locality),
     county: String(row.county),
+    eircode: row.eircode ? String(row.eircode) : null,
     price: Number(row.price),
     bedrooms: Number(row.bedrooms),
     bathrooms: Number(row.bathrooms),
@@ -71,6 +72,8 @@ export function databaseRowToProperty(row: Record<string, unknown>): Property {
     latitude: Number(row.latitude),
     longitude: Number(row.longitude),
     imageUrl: String(row.image_url),
+    imageUrls: toStringArray(row.image_urls, String(row.image_url)),
+    contentRightsConfirmed: Boolean(row.content_rights_confirmed),
     summary: String(row.summary),
     description: String(row.description),
     firstSeen: String(row.first_seen),
@@ -92,4 +95,14 @@ export function databaseRowToProperty(row: Record<string, unknown>): Property {
       ? String(row.boundary_evidence_path)
       : null,
   };
+}
+
+function toStringArray(value: unknown, fallback: string): string[] {
+  if (!Array.isArray(value)) return fallback ? [fallback] : [];
+  const items = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (items.length > 0) return Array.from(new Set(items));
+  return fallback ? [fallback] : [];
 }

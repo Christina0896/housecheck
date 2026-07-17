@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -18,8 +17,10 @@ import {
   Waves,
 } from "lucide-react";
 import { EvidenceBadge } from "@/components/evidence-badge";
+import { PropertyGallery } from "@/components/property-gallery";
 import { formatCurrency, formatDate, formatDistance } from "@/lib/format";
 import { getProperties, getPropertyBySlug } from "@/lib/property-data";
+import { getPublicDescription, getPublicImageUrls } from "@/lib/property-public";
 import type { Property } from "@/lib/types";
 
 export async function generateStaticParams() {
@@ -50,6 +51,9 @@ export default async function PropertyPage({
   const property = await getPropertyBySlug(slug);
   if (!property) notFound();
 
+  const publicImages = getPublicImageUrls(property);
+  const publicDescription = getPublicDescription(property);
+
   return (
     <main className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-7 sm:px-6 lg:px-8 lg:py-10">
       <Link
@@ -62,16 +66,9 @@ export default async function PropertyPage({
 
       <section className="mt-5 overflow-hidden rounded-[30px] border border-stone-200 bg-white shadow-[0_18px_60px_rgba(31,45,39,0.08)]">
         <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="relative min-h-[340px] bg-stone-200 sm:min-h-[460px] lg:min-h-[570px]">
-            <Image
-              alt={`${property.title}, ${property.locality}`}
-              className="object-cover"
-              fill
-              priority
-              sizes="(max-width: 1024px) 100vw, 58vw"
-              src={property.imageUrl}
-            />
-            <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-5">
+          <div className="relative bg-stone-200">
+            <PropertyGallery images={publicImages} title={property.title} />
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between gap-3 p-5">
               <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold text-emerald-950 shadow-sm backdrop-blur">
                 {property.sourceName}
               </span>
@@ -99,6 +96,12 @@ export default async function PropertyPage({
               <MapPin aria-hidden="true" className="size-4" />
               {property.address}, Co. {property.county}
             </p>
+            <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-stone-100 px-3 py-2 text-sm font-extrabold text-stone-800">
+              <span className="text-[10px] uppercase tracking-[0.12em] text-stone-500">
+                Eircode
+              </span>
+              <span>{property.eircode ?? "Not supplied"}</span>
+            </div>
             <p className="mt-7 text-4xl font-black tracking-[-0.04em] text-[#173f35]">
               {formatCurrency(property.price)}
             </p>
@@ -190,12 +193,21 @@ export default async function PropertyPage({
         <div className="space-y-7">
           <section className="rounded-[24px] border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
             <p className="text-xs font-extrabold uppercase tracking-[0.13em] text-emerald-800">
-              Listing summary
+              {publicDescription.isOriginalListingDescription
+                ? "Original listing description"
+                : "HouseCheck summary"}
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.035em] text-stone-950">
-              What the scraper found
+              Property description
             </h2>
-            <p className="mt-4 text-base leading-7 text-stone-700">{property.description}</p>
+            <p className="mt-4 whitespace-pre-line text-base leading-7 text-stone-700">
+              {publicDescription.text}
+            </p>
+            {publicDescription.isOriginalListingDescription ? (
+              <p className="mt-4 rounded-xl bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
+                Description attributed to {property.sourceName}. Check the original listing for the latest wording.
+              </p>
+            ) : null}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {property.features.map((feature) => (

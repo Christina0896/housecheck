@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { normaliseEircode } from "@/lib/eircode";
 import { slugify } from "@/lib/format";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -35,6 +36,7 @@ const ingestSchema = z.object({
   address: z.string().min(1).max(500),
   locality: z.string().min(1).max(150),
   county: z.string().min(1).max(100),
+  eircode: z.string().trim().max(8).nullable().optional().default(null),
   price: z.number().int().nonnegative(),
   bedrooms: z.number().int().nonnegative(),
   bathrooms: z.number().int().nonnegative(),
@@ -47,8 +49,9 @@ const ingestSchema = z.object({
   latitude: z.number().gte(-90).lte(90),
   longitude: z.number().gte(-180).lte(180),
   imageUrl: httpsUrlSchema,
+  imageUrls: z.array(httpsUrlSchema).max(50).optional().default([]),
   summary: z.string().max(800),
-  description: z.string().max(20000),
+  description: z.string().max(40000),
   firstSeen: z.iso.date(),
   lastSeen: z.iso.date(),
   settings: z.array(
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
   const { data: previous } = await supabase
     .from("properties")
     .select(
-      "id, price, first_seen, review_status, is_active, review_notes, boundary_evidence_path, reviewed_at, settings, land_acres, land_hectares, land_evidence",
+      "id, price, first_seen, review_status, is_active, review_notes, boundary_evidence_path, reviewed_at, settings, land_acres, land_hectares, land_evidence, eircode, image_url, image_urls, description, title, address, content_rights_confirmed",
     )
     .eq("source_name", input.sourceName)
     .eq("source_id", input.sourceId)
@@ -134,6 +137,36 @@ export async function POST(request: NextRequest) {
     ),
   ];
   const buyerVerifiedLand = previous?.land_evidence === "buyer-verified";
+  const eircode = normaliseEircode(input.eircode);
+  const sourceImageUrls = normalizeImageUrls(input.imageUrls, input.imageUrl);
+  const previousImageUrls = normalizeImageUrls(
+    Array.isArray(previous?.image_urls)
+      ? previous.image_urls.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [],
+    previous?.image_url ? String(previous.image_url) : "",
+  );
+  const uploadedImageUrls = previousImageUrls.filter(isHouseCheckUploadedImage);
+  const previousSourceImageUrls = previousImageUrls.filter(
+    (value) => !isHouseCheckUploadedImage(value),
+  );
+  const imageUrls = normalizeImageUrls(
+    [...uploadedImageUrls, ...sourceImageUrls],
+    sourceImageUrls[0] ?? input.imageUrl,
+  );
+  const sourceContentChanged = Boolean(
+    previous &&
+      (String(previous.title) !== input.title ||
+        String(previous.address) !== input.address ||
+        normaliseEircode(previous.eircode ? String(previous.eircode) : null) !==
+          eircode ||
+        String(previous.description) !== input.description ||
+        !sameStringArray(previousSourceImageUrls, sourceImageUrls)),
+  );
+  const reviewStatus = sourceContentChanged
+    ? "pending"
+    : previous?.review_status ?? "pending";
 
   const record = {
     source_id: input.sourceId,
@@ -144,6 +177,7 @@ export async function POST(request: NextRequest) {
     address: input.address,
     locality: input.locality,
     county: input.county,
+    eircode,
     price: input.price,
     bedrooms: input.bedrooms,
     bathrooms: input.bathrooms,
@@ -159,7 +193,11 @@ export async function POST(request: NextRequest) {
       : input.landEvidence,
     latitude: input.latitude,
     longitude: input.longitude,
-    image_url: input.imageUrl,
+    image_url: imageUrls[0],
+    image_urls: imageUrls,
+    content_rights_confirmed: sourceContentChanged
+      ? false
+      : previous?.content_rights_confirmed ?? false,
     summary: input.summary,
     description: input.description,
     first_seen: previous?.first_seen ?? input.firstSeen,
@@ -172,11 +210,12 @@ export async function POST(request: NextRequest) {
     nearest_forest: input.nearestForest,
     features: input.features,
     match_score: input.matchScore,
-    review_status: previous?.review_status ?? "pending",
+    review_status: reviewStatus,
     review_notes: previous?.review_notes ?? "",
     boundary_evidence_path: previous?.boundary_evidence_path ?? null,
-    reviewed_at: previous?.reviewed_at ?? null,
-    is_active: previous?.is_active ?? true,
+    reviewed_at: sourceContentChanged ? null : previous?.reviewed_at ?? null,
+    is_active:
+      reviewStatus === "approved" ? (previous?.is_active ?? true) : false,
   };
 
   const { data, error } = await supabase
@@ -199,4 +238,19 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, property: data });
+}
+
+function normalizeImageUrls(imageUrls: string[], fallback: string): string[] {
+  const values = [...imageUrls, fallback]
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return Array.from(new Set(values)).slice(0, 50);
+}
+
+function sameStringArray(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function isHouseCheckUploadedImage(value: string): boolean {
+  return value.includes("/storage/v1/object/public/property-images/");
 }

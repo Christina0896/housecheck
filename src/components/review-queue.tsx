@@ -6,13 +6,16 @@ import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
   Check,
+  Copyright,
   ExternalLink,
   FileImage,
+  ImagePlus,
   LoaderCircle,
   LogOut,
   RefreshCw,
   RotateCcw,
   Save,
+  Trash2,
   Trees,
   Upload,
   Waves,
@@ -27,7 +30,6 @@ import type {
   ReviewStatus,
   SettingLabel,
 } from "@/lib/types";
-
 
 const settingOptions: Array<{
   label: SettingLabel;
@@ -278,9 +280,19 @@ function ReviewCard({
   const [landAcres, setLandAcres] = useState(
     property.landAcres === null ? "" : String(property.landAcres),
   );
+  const [eircode, setEircode] = useState(property.eircode ?? "");
+  const [description, setDescription] = useState(property.description);
+  const [imageUrls, setImageUrls] = useState<string[]>(
+    property.imageUrls.length > 0 ? property.imageUrls : [property.imageUrl],
+  );
+  const [contentRightsConfirmed, setContentRightsConfirmed] = useState(
+    property.contentRightsConfirmed,
+  );
   const [reviewNotes, setReviewNotes] = useState(property.reviewNotes);
   const [evidenceUrl, setEvidenceUrl] = useState(property.boundaryEvidenceUrl);
   const [uploading, setUploading] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [removingPhoto, setRemovingPhoto] = useState<string | null>(null);
   const [savingStatus, setSavingStatus] = useState<ReviewStatus | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -320,6 +332,66 @@ function ReviewCard({
     }
   };
 
+
+  const uploadPhotos = async (files: File[]) => {
+    if (files.length === 0) return;
+    setUploadingPhotos(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+      const response = await fetch(
+        `/api/review/properties/${encodeURIComponent(property.id)}/images`,
+        { method: "POST", body: formData },
+      );
+      const body = (await response.json()) as {
+        error?: string;
+        imageUrls?: string[];
+      };
+      if (!response.ok) throw new Error(body.error ?? "Could not upload photos");
+      setImageUrls(body.imageUrls ?? []);
+      setContentRightsConfirmed(false);
+      setMessage(`${files.length} photo${files.length === 1 ? "" : "s"} uploaded.`);
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not upload photos");
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
+
+  const removePhoto = async (url: string) => {
+    setRemovingPhoto(url);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/review/properties/${encodeURIComponent(property.id)}/images`,
+        {
+          method: "DELETE",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url }),
+        },
+      );
+      const body = (await response.json()) as {
+        error?: string;
+        imageUrls?: string[];
+      };
+      if (!response.ok) throw new Error(body.error ?? "Could not remove photo");
+      setImageUrls(body.imageUrls ?? []);
+      setContentRightsConfirmed(false);
+      setMessage("Photo removed.");
+      router.refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not remove photo");
+    } finally {
+      setRemovingPhoto(null);
+    }
+  };
+
   const saveReview = async (nextStatus: ReviewStatus) => {
     setSavingStatus(nextStatus);
     setError("");
@@ -328,6 +400,25 @@ function ReviewCard({
     const parsedAcres = landAcres.trim() === "" ? null : Number(landAcres);
     if (parsedAcres !== null && (!Number.isFinite(parsedAcres) || parsedAcres < 0)) {
       setError("Enter a valid acreage value.");
+      setSavingStatus(null);
+      return;
+    }
+    if (nextStatus === "approved" && !contentRightsConfirmed) {
+      setError("Confirm permission to display the description and photographs.");
+      setSavingStatus(null);
+      return;
+    }
+    if (nextStatus === "approved" && description.trim().length < 20) {
+      setError("Add the complete listing description before publishing.");
+      setSavingStatus(null);
+      return;
+    }
+    if (
+      nextStatus === "approved" &&
+      (imageUrls.length === 0 ||
+        imageUrls.every((url) => url.includes("property-placeholder")))
+    ) {
+      setError("Add at least one real property photograph before publishing.");
       setSavingStatus(null);
       return;
     }
@@ -342,6 +433,10 @@ function ReviewCard({
             reviewStatus: nextStatus,
             reviewNotes,
             landAcres: parsedAcres,
+            eircode: eircode.trim() || null,
+            description,
+            imageUrls,
+            contentRightsConfirmed,
             settings: selectedLabels.map((label) => ({
               label,
               detail:
@@ -377,7 +472,7 @@ function ReviewCard({
               className="object-cover"
               fill
               sizes="(max-width: 1024px) 100vw, 40vw"
-              src={property.imageUrl}
+              src={imageUrls[0] ?? property.imageUrl}
             />
             <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-4">
               <span className="rounded-full bg-white/95 px-3 py-1.5 text-xs font-extrabold capitalize text-stone-900 shadow-sm backdrop-blur">
@@ -435,7 +530,7 @@ function ReviewCard({
         </div>
 
         <div className="p-5 sm:p-7 lg:p-8">
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-3">
             <label>
               <span className="filter-label">Confirmed acreage</span>
               <input
@@ -448,13 +543,27 @@ function ReviewCard({
                 value={landAcres}
               />
             </label>
+            <label>
+              <span className="filter-label">Eircode</span>
+              <input
+                autoCapitalize="characters"
+                className="filter-input mt-2 uppercase"
+                maxLength={8}
+                onChange={(event) => setEircode(event.target.value.toUpperCase())}
+                placeholder="P12 A1B2"
+                value={eircode}
+              />
+              <span className="mt-2 block text-[11px] leading-4 text-stone-500">
+                Use the exact Eircode only when the listing or agent confirms it.
+              </span>
+            </label>
             <div>
               <span className="filter-label">Current land evidence</span>
               <div className="mt-3">
                 <EvidenceBadge level={property.landEvidence} />
               </div>
               <p className="mt-2 text-[11px] leading-4 text-stone-500">
-                Saving this review marks the acreage and selected setting tags as buyer verified.
+                Saving marks the acreage and selected setting tags as buyer verified.
               </p>
             </div>
           </div>
@@ -499,6 +608,101 @@ function ReviewCard({
               })}
             </div>
           </fieldset>
+
+          <section className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="filter-label">Complete listing description</p>
+                <p className="mt-1 text-[11px] leading-5 text-stone-500">
+                  Check the wording against the original listing before publication.
+                </p>
+              </div>
+              <span className="text-[11px] font-bold text-stone-500">
+                {description.length.toLocaleString()} characters
+              </span>
+            </div>
+            <textarea
+              className="mt-3 min-h-56 w-full resize-y rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm leading-6 text-stone-800 outline-none focus:border-emerald-700 focus:ring-3 focus:ring-emerald-700/10"
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setContentRightsConfirmed(false);
+              }}
+              placeholder="Paste or verify the complete property description here."
+              value={description}
+            />
+          </section>
+
+          <section className="mt-6 rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="filter-label">Property photographs</p>
+                <p className="mt-1 text-[11px] leading-5 text-stone-500">
+                  These are public after approval. Upload the actual house and land photographs, not the private boundary evidence.
+                </p>
+              </div>
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#173f35] px-4 text-xs font-extrabold text-white hover:bg-[#205447]">
+                {uploadingPhotos ? (
+                  <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+                ) : (
+                  <ImagePlus aria-hidden="true" className="size-4" />
+                )}
+                Add photos
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  disabled={uploadingPhotos}
+                  multiple
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+                    if (files.length > 0) void uploadPhotos(files);
+                    event.currentTarget.value = "";
+                  }}
+                  type="file"
+                />
+              </label>
+            </div>
+
+            {imageUrls.length > 0 ? (
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                {imageUrls.map((url, index) => (
+                  <div
+                    className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
+                    key={`${url}-${index}`}
+                  >
+                    <Image
+                      alt={`${property.title} photograph ${index + 1}`}
+                      className="object-cover"
+                      fill
+                      sizes="(max-width: 640px) 50vw, 220px"
+                      src={url}
+                    />
+                    <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-2">
+                      <span className="rounded-full bg-black/65 px-2 py-1 text-[10px] font-extrabold text-white backdrop-blur">
+                        {index === 0 ? "Main photo" : `Photo ${index + 1}`}
+                      </span>
+                      <button
+                        aria-label={`Remove photograph ${index + 1}`}
+                        className="grid size-8 place-items-center rounded-full bg-white/95 text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-60"
+                        disabled={removingPhoto === url}
+                        onClick={() => void removePhoto(url)}
+                        type="button"
+                      >
+                        {removingPhoto === url ? (
+                          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 aria-hidden="true" className="size-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-6 text-center text-sm font-semibold text-stone-500">
+                No public property photographs have been added.
+              </div>
+            )}
+          </section>
 
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
             <div>
@@ -558,6 +762,26 @@ function ReviewCard({
             </div>
           ) : null}
 
+          <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <input
+              checked={contentRightsConfirmed}
+              className="mt-1 size-4 accent-emerald-800"
+              onChange={(event) => setContentRightsConfirmed(event.target.checked)}
+              type="checkbox"
+            />
+            <span className="flex min-w-0 gap-3">
+              <Copyright aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-amber-900" />
+              <span>
+                <span className="block text-sm font-black text-amber-950">
+                  Permission to display source content
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-amber-950/75">
+                  I confirm that HouseCheck may display this listing description and these photographs. Approval is blocked until this is confirmed.
+                </span>
+              </span>
+            </span>
+          </label>
+
           {error ? (
             <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
               {error}
@@ -571,7 +795,12 @@ function ReviewCard({
 
           <ReviewActions
             currentStatus={currentTab}
-            disabled={savingStatus !== null || uploading}
+            disabled={
+              savingStatus !== null ||
+              uploading ||
+              uploadingPhotos ||
+              removingPhoto !== null
+            }
             onSave={(nextStatus) => void saveReview(nextStatus)}
             savingStatus={savingStatus}
           />

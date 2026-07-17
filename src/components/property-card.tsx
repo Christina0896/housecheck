@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Compass,
+  Images,
   MapPin,
   Ruler,
   Sparkles,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { formatCurrency, formatDistance } from "@/lib/format";
+import { getPublicImageUrls } from "@/lib/property-public";
 import type { Property } from "@/lib/types";
 
 function SettingIcon({ label }: { label: string }) {
@@ -44,6 +46,8 @@ export function PropertyCard({
   selected: boolean;
   onToggleCompare: (propertyId: string) => void;
 }) {
+  const publicImages = getPublicImageUrls(property);
+
   return (
     <article className="group flex min-w-0 flex-col overflow-hidden rounded-[24px] border border-stone-200 bg-white shadow-[0_1px_2px_rgba(30,41,35,0.04),0_16px_40px_rgba(30,41,35,0.06)] transition duration-300 hover:-translate-y-1 hover:border-stone-300 hover:shadow-[0_4px_8px_rgba(30,41,35,0.05),0_24px_55px_rgba(30,41,35,0.10)]">
       <div className="relative aspect-[16/10] overflow-hidden bg-stone-200">
@@ -53,7 +57,7 @@ export function PropertyCard({
           fill
           priority={property.matchScore > 90}
           sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-          src={property.imageUrl}
+          src={publicImages[0]}
         />
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4">
           <div className="flex flex-wrap gap-2">
@@ -73,10 +77,16 @@ export function PropertyCard({
             {property.matchScore}% match
           </span>
         </div>
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent px-4 pb-4 pt-12 text-white">
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/65 via-black/20 to-transparent px-4 pb-4 pt-12 text-white">
           <p className="text-[26px] font-black tracking-[-0.04em]">
             {formatCurrency(property.price)}
           </p>
+          {publicImages.length > 1 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-extrabold backdrop-blur">
+              <Images aria-hidden="true" className="size-3.5" />
+              {publicImages.length}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -90,6 +100,11 @@ export function PropertyCard({
               <MapPin aria-hidden="true" className="size-3.5 shrink-0" />
               {property.locality}, Co. {property.county}
             </p>
+            {property.eircode ? (
+              <p className="mt-1 text-xs font-extrabold uppercase tracking-[0.08em] text-stone-500">
+                Eircode {property.eircode}
+              </p>
+            ) : null}
           </div>
           <div className="shrink-0 rounded-2xl bg-[#eef4ed] px-3 py-2 text-right ring-1 ring-emerald-900/10">
             <p className="text-lg font-black tracking-[-0.03em] text-emerald-950">

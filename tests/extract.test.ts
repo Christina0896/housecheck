@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   extractBerRating,
+  extractEircode,
   extractFloorAreaSqm,
   extractLandSize,
   extractPrice,
+  normalizeDescription,
 } from "../scripts/scraper/extract";
 
 test("extracts approximate acres from listing prose", () => {
@@ -37,4 +39,18 @@ test("extracts common listing facts", () => {
   assert.equal(extractPrice(text), 425000);
   assert.equal(extractFloorAreaSqm(text), 185);
   assert.equal(extractBerRating(text), "B2");
+});
+
+
+test("extracts and formats an Eircode", () => {
+  assert.equal(extractEircode("Toonlane, Co. Cork, P12YN40"), "P12 YN40");
+  assert.equal(extractEircode("Dublin routing key D6W X123"), "D6W X123");
+  assert.equal(extractEircode("No postal code stated"), null);
+});
+
+test("keeps paragraphs in a listing description", () => {
+  assert.equal(
+    normalizeDescription("First paragraph.\n\n  Second   paragraph.  "),
+    "First paragraph.\n\nSecond paragraph.",
+  );
 });

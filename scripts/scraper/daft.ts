@@ -5,9 +5,11 @@ import {
   extractBathrooms,
   extractBedrooms,
   extractBerRating,
+  extractEircode,
   extractFloorAreaSqm,
   extractLandSize,
   extractPrice,
+  normalizeDescription,
   normalizeWhitespace,
   summarize,
 } from "./extract";
@@ -119,6 +121,9 @@ export async function scrapeDaftListing(
       address: pageData.address || pageData.title || "Address not stated",
       locality,
       county,
+      eircode: extractEircode(
+        `${pageData.address} ${pageData.description} ${pageData.bodyText}`,
+      ),
       price,
       bedrooms,
       bathrooms,
@@ -130,9 +135,16 @@ export async function scrapeDaftListing(
       landEvidence: land ? "agent-stated" : "estimated",
       latitude: pageData.latitude,
       longitude: pageData.longitude,
-      imageUrl: pageData.imageUrl ?? "https://placehold.co/1200x800?text=Property",
+      imageUrl:
+        pageData.imageUrls[0] ?? "https://placehold.co/1200x800?text=Property",
+      imageUrls:
+        pageData.imageUrls.length > 0
+          ? pageData.imageUrls
+          : ["https://placehold.co/1200x800?text=Property"],
       summary: summarize(pageData.description || pageData.bodyText, 320),
-      description: normalizeWhitespace(pageData.description || pageData.bodyText).slice(0, 20000),
+      description: normalizeDescription(
+        pageData.description || pageData.bodyText,
+      ).slice(0, 40000),
       firstSeen: today,
       lastSeen: today,
       settings,
@@ -158,32 +170,30 @@ async function readPageData(page: Page) {
   const title = normalizeWhitespace(
     (await page.locator("h1").first().textContent().catch(() => null)) ?? "",
   );
-  const description = await firstText(page, [
+  const rawDescription = await firstText(page, [
     '[data-testid*="description"]',
     '[class*="Description"]',
     'section:has(h2:has-text("Description"))',
     'section:has(h3:has-text("Description"))',
     "main",
   ]);
+  const description = normalizeDescription(rawDescription || bodyText);
   const priceText =
     (await page.locator('[data-testid*="price"]').first().textContent().catch(() => null)) ??
     bodyText;
-  const imageUrl = await page
-    .locator('meta[property="og:image"]')
-    .getAttribute("content")
-    .catch(() => null);
   const address =
     (await page.locator('[data-testid*="address"]').first().textContent().catch(() => null)) ??
     title;
   const html = await page.content();
   const coordinates = await findCoordinates(page, html);
+  const imageUrls = await findImageUrls(page, html);
 
   return {
     bodyText,
     title,
-    description: normalizeWhitespace(description || bodyText),
+    description,
     priceText,
-    imageUrl,
+    imageUrls,
     address: normalizeWhitespace(address),
     ...coordinates,
   };
@@ -197,6 +207,80 @@ async function firstText(page: Page, selectors: string[]): Promise<string> {
     if (text.trim().length > 80) return text;
   }
   return "";
+}
+
+async function findImageUrls(page: Page, html: string): Promise<string[]> {
+  const metaUrls = await page
+    .locator('meta[property="og:image"], meta[name="twitter:image"]')
+    .evaluateAll((nodes) =>
+      nodes
+        .map((node) => node.getAttribute("content"))
+        .filter((value): value is string => Boolean(value)),
+    )
+    .catch(() => [] as string[]);
+
+  const domUrls = await page
+    .locator("img")
+    .evaluateAll((images) =>
+      images.flatMap((image) => {
+        const element = image as HTMLImageElement;
+        const srcset = element.getAttribute("srcset") ?? "";
+        const srcsetUrls = srcset
+          .split(",")
+          .map((candidate) => candidate.trim().split(/\s+/)[0])
+          .filter(Boolean);
+        return [
+          element.currentSrc,
+          element.src,
+          element.getAttribute("data-src") ?? "",
+          element.getAttribute("data-lazy-src") ?? "",
+          ...srcsetUrls,
+        ];
+      }),
+    )
+    .catch(() => [] as string[]);
+
+  const decodedHtml = html
+    .replace(/\\u002F/gi, "/")
+    .replace(/\\\//g, "/")
+    .replace(/&amp;/g, "&");
+  const embeddedUrls = Array.from(
+    decodedHtml.matchAll(
+      /https:\/\/[^"'<>\s]+?(?:\.jpe?g|\.png|\.webp)(?:\?[^"'<>\s]*)?/gi,
+    ),
+    (match) => match[0],
+  );
+
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of [...metaUrls, ...domUrls, ...embeddedUrls]) {
+    const normalized = normalizeImageUrl(candidate);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    urls.push(normalized);
+    if (urls.length >= 40) break;
+  }
+  return urls;
+}
+
+function normalizeImageUrl(value: string): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return null;
+    const lower = url.toString().toLowerCase();
+    if (/(?:logo|avatar|favicon|sprite|icon|badge|map-marker)/.test(lower)) {
+      return null;
+    }
+    const looksLikePropertyImage =
+      url.hostname.includes("propertyimages") ||
+      url.hostname.includes("daft") ||
+      /(?:photo|image|media|gallery)/.test(url.pathname.toLowerCase()) ||
+      /\.(?:jpe?g|png|webp)$/i.test(url.pathname);
+    return looksLikePropertyImage ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function findCoordinates(

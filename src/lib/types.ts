@@ -27,6 +27,7 @@ export type PropertySetting = {
   detail?: string;
 };
 
+
 export type PropertyDistances = {
   lakeKm: number | null;
   coastKm: number | null;
@@ -44,6 +45,7 @@ export type Property = {
   address: string;
   locality: string;
   county: string;
+  eircode: string | null;
   price: number;
   bedrooms: number;
   bathrooms: number;
@@ -56,6 +58,8 @@ export type Property = {
   latitude: number;
   longitude: number;
   imageUrl: string;
+  imageUrls: string[];
+  contentRightsConfirmed: boolean;
   summary: string;
   description: string;
   firstSeen: string;
@@ -92,6 +96,7 @@ export type IngestPropertyPayload = Omit<
   | "reviewNotes"
   | "reviewedAt"
   | "boundaryEvidencePath"
+  | "contentRightsConfirmed"
 > & {
   id?: string;
   slug?: string;

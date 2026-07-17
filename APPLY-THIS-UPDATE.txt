@@ -1,25 +1,39 @@
-HOUSECHECK REVIEW APPROVAL UPDATE
+HOUSECHECK — EIRCODE, FULL DESCRIPTION AND PHOTO GALLERY UPDATE
 
-1. Stop the running website with Ctrl+C.
-2. Copy all files and folders from this update into:
+This update assumes migrations 001 and 002 are already installed.
+
+1. Stop HouseCheck in VS Code with Ctrl+C.
+2. Open this ZIP and copy all files and folders into:
    C:\Users\Chris\Desktop\housecheck
-3. Choose Replace the files in the destination when Windows asks.
-4. Do not delete or replace your .env.local file. This update does not contain one.
-5. In Supabase SQL Editor, run:
-   supabase\migrations\002_review_approval.sql
-6. Restart the website:
+3. Choose "Replace the files in the destination" when Windows asks.
+4. The ZIP does not contain .env.local or package-lock.json, so it will not
+   replace your private keys or your corrected npm lock file.
+5. In Supabase open SQL Editor -> New query.
+6. Copy and run:
+   supabase\migrations\003_property_source_content.sql
+7. Restart HouseCheck:
    npm run dev
-7. Open:
+8. Open:
    http://localhost:3000/review
-8. Enter your existing INGEST_API_KEY from .env.local.
-   You can instead add REVIEW_ADMIN_KEY=another-private-password and use that.
-9. Upload the aerial boundary image, correct the setting tags, and approve the house.
+9. Review each property:
+   - check or enter the Eircode;
+   - verify the full source-listing description;
+   - upload the actual house and land photographs;
+   - keep the red-boundary image in Boundary evidence (it stays private);
+   - tick the permission-to-display checkbox;
+   - press Approve and publish.
 
-Classification used by this update:
-- Woodland on property: woodland is inside the red property boundary.
-- Forest edge: the boundary touches forest outside the property.
-- Near forest: forest is nearby but separate.
-- River frontage: the property boundary directly meets a river.
-- Riverside: near a river, but frontage is not confirmed.
+WHAT CHANGES
 
-New imports stay pending and hidden until approved.
+- Eircode appears on the property card, detail page and comparison page.
+- The full approved listing description appears with paragraph breaks and
+  source attribution.
+- Each property can have up to 30 JPG, PNG or WebP photographs in a gallery.
+- New or changed source descriptions/photos return to Pending for review.
+- Public pages hide unapproved source descriptions and photos.
+- Existing approved rows return to Pending once after migration 003 so you can
+  verify their content.
+- Eircodes already present in an address are backfilled automatically.
+
+The Daft importer remains permission-gated. Manual approval controls what is
+published in HouseCheck; it does not grant rights to copy source content.

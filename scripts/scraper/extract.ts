@@ -140,6 +140,26 @@ export function extractBerRating(text: string): string | null {
   return null;
 }
 
+export function extractEircode(text: string): string | null {
+  const match = text.toUpperCase().match(
+    /\b((?:[AC-FHKNPRTV-Y]\d{2}|D6W)\s?[0-9AC-FHKNPRTV-Y]{4})\b/,
+  );
+  if (!match) return null;
+  const compact = match[1].replace(/\s+/g, "");
+  return `${compact.slice(0, 3)} ${compact.slice(3)}`;
+}
+
+export function normalizeDescription(text: string): string {
+  return text
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function summarize(text: string, maxLength = 280): string {
   const clean = normalizeWhitespace(text);
   if (clean.length <= maxLength) return clean;

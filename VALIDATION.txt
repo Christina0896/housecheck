@@ -1,0 +1,8 @@
+Validation completed in the build environment:
+
+- npm run lint: passed
+- npm run typecheck: passed
+- npm test: 8/8 passed
+- npm run build: passed
+
+Validated with Node.js/Next.js project dependencies from package-lock.json.

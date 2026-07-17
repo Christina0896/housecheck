@@ -6,7 +6,7 @@ The repository contains:
 
 - a Next.js 16 website with filtering, property analysis and comparison;
 - a private approval queue for Christina and Jan that keeps new listings hidden until approval;
-- private boundary-image storage in Supabase;
+- private boundary-image storage and a public approved-photo gallery in Supabase;
 - a PostgreSQL/Supabase schema;
 - a protected ingestion API;
 - a scheduled Playwright scraper worker;
@@ -24,12 +24,16 @@ Open `http://localhost:3000/review` and enter the private `REVIEW_ADMIN_KEY`. If
 - check and correct the acreage;
 - distinguish **Woodland on property** from **Forest edge** and **Near forest**;
 - confirm river frontage, riverside, lake and coast classifications;
+- enter or verify the exact Eircode;
+- verify the complete source-listing description;
+- upload and remove the public house and land photographs;
 - upload an aerial image or folio screenshot showing the property boundary;
+- confirm permission to display the description and photographs;
 - save a review while keeping the property hidden;
 - approve and publish the property;
 - reject the property.
 
-Boundary images are stored in a private Supabase Storage bucket. The review page uses short-lived signed URLs, so the images are not public.
+Boundary images are stored in a private Supabase Storage bucket. Approved property photographs are stored separately in a public read-only gallery bucket. The review page blocks publication until the description, photographs and display permission are confirmed.
 
 ## Current interface
 
@@ -79,6 +83,7 @@ npm run check
 2. Run these files in order in the Supabase SQL Editor:
    - `supabase/migrations/001_initial_schema.sql`
    - `supabase/migrations/002_review_approval.sql`
+   - `supabase/migrations/003_property_source_content.sql`
 3. Add these variables to `.env.local` and to the web host:
 
 ```bash
@@ -99,9 +104,11 @@ HouseCheck separates automated screening from your final decision:
 1. An authorised source importer creates or updates a property.
 2. A new property is stored as **pending** and is not shown on the public search.
 3. Open `/review` and enter the private review key.
-4. Confirm acreage and choose the correct setting labels.
-5. Upload an aerial boundary image or folio excerpt as private evidence when useful.
-6. Approve to publish, reject to hide, or save it in pending.
+4. Confirm acreage, Eircode and the correct setting labels.
+5. Check the complete listing description and add the approved property photographs.
+6. Upload an aerial boundary image or folio excerpt as private evidence when useful.
+7. Confirm permission to display the source description and photographs.
+8. Approve to publish, reject to hide, or save it in pending.
 
 The setting labels distinguish:
 
@@ -111,7 +118,7 @@ The setting labels distinguish:
 - **River frontage** — the boundary directly meets a river.
 - **Riverside** — the property is beside a river, but frontage is not confirmed.
 
-Boundary evidence is stored in a private Supabase Storage bucket and displayed in the review queue through a short-lived signed URL. It is not published on the public property page.
+Boundary evidence is stored in a private Supabase Storage bucket and displayed in the review queue through a short-lived signed URL. It is not published on the public property page. Approved listing photographs use a separate public bucket and appear as a gallery on the property page.
 
 ## Scraper setup
 

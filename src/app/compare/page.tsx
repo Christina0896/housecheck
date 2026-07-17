@@ -12,6 +12,7 @@ import {
 import { EvidenceBadge } from "@/components/evidence-badge";
 import { formatCurrency, formatDistance } from "@/lib/format";
 import { getProperties } from "@/lib/property-data";
+import { getPublicImageUrls } from "@/lib/property-public";
 import type { Property } from "@/lib/types";
 
 export const metadata = {
@@ -96,7 +97,7 @@ export default async function ComparePage({
                           className="object-cover transition duration-500 group-hover:scale-[1.03]"
                           fill
                           sizes="300px"
-                          src={property.imageUrl}
+                          src={getPublicImageUrls(property)[0]}
                         />
                         <span className="absolute right-3 top-3 rounded-full bg-[#173f35]/95 px-2.5 py-1 text-[11px] font-extrabold text-white">
                           {property.matchScore}% match
@@ -121,6 +122,15 @@ export default async function ComparePage({
                 {properties.map((property) => (
                   <CompareCell key={property.id} emphasis>
                     {formatCurrency(property.price)}
+                  </CompareCell>
+                ))}
+              </CompareRow>
+              <CompareRow label="Eircode">
+                {properties.map((property) => (
+                  <CompareCell key={property.id}>
+                    <p className="font-extrabold text-stone-900">
+                      {property.eircode ?? "Not supplied"}
+                    </p>
                   </CompareCell>
                 ))}
               </CompareRow>

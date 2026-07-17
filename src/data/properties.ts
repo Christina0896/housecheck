@@ -1,6 +1,6 @@
 import type { Property } from "@/lib/types";
 
-export const demoProperties: Property[] = [
+const demoPropertyRows: Array<Omit<Property, "eircode" | "imageUrls" | "contentRightsConfirmed">> = [
   {
     id: "hc-001",
     slug: "lough-view-cottage-macroom",
@@ -288,6 +288,13 @@ export const demoProperties: Property[] = [
     matchScore: 74,
   },
 ];
+
+export const demoProperties: Property[] = demoPropertyRows.map((property) => ({
+  ...property,
+  eircode: null,
+  imageUrls: [property.imageUrl],
+  contentRightsConfirmed: true,
+}));
 
 export const counties = Array.from(
   new Set(demoProperties.map((property) => property.county)),
