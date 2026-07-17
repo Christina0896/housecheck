@@ -1,0 +1,24 @@
+services:
+  - type: cron
+    name: housecheck-scraper
+    runtime: docker
+    dockerfilePath: ./Dockerfile.scraper
+    dockerContext: .
+    schedule: "0 7 * * *"
+    envVars:
+      - key: SEARCH_URLS
+        sync: false
+      - key: INGEST_API_URL
+        sync: false
+      - key: INGEST_API_KEY
+        sync: false
+      - key: SCRAPER_SOURCE_PERMISSION_CONFIRMED
+        value: "false"
+      - key: SCRAPER_USER_AGENT
+        sync: false
+      - key: MAX_LISTINGS_PER_RUN
+        value: "25"
+      - key: REQUEST_DELAY_MS
+        value: "5000"
+      - key: SCRAPER_HEADLESS
+        value: "true"
