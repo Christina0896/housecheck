@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Bot,
+  ClipboardCheck,
   Database,
   FileSearch,
   LandPlot,
@@ -37,8 +38,14 @@ const steps = [
   {
     icon: Database,
     number: "04",
-    title: "Store and compare",
-    copy: "Clean records are saved in PostgreSQL through Supabase, including first-seen dates, price changes, evidence levels and analysis results.",
+    title: "Store as pending",
+    copy: "Clean records are saved in PostgreSQL through Supabase, but new listings remain hidden from the public search.",
+  },
+  {
+    icon: ClipboardCheck,
+    number: "05",
+    title: "Review and approve",
+    copy: "You confirm acreage and setting labels, add private boundary evidence when useful, then approve, reject or keep the property pending.",
   },
 ];
 
@@ -89,10 +96,15 @@ export default function HowItWorksPage() {
               Evidence, not certainty
             </p>
             <h2 className="mt-3 text-3xl font-black tracking-[-0.045em] text-stone-950 sm:text-4xl">
-              Three levels make the source clear.
+              Four levels make the source clear.
             </h2>
           </div>
           <div className="space-y-3">
+            <EvidenceRow
+              icon={ShieldCheck}
+              label="Buyer verified"
+              copy="Confirmed by you during the private review, often using a marked boundary image or brochure map."
+            />
             <EvidenceRow
               icon={MapPinned}
               label="Map checked"
@@ -130,7 +142,7 @@ export default function HowItWorksPage() {
               className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#173f35] px-4 text-sm font-extrabold text-white"
               href="/"
             >
-              Explore demo
+              Explore approved homes
               <ArrowRight aria-hidden="true" className="size-4" />
             </Link>
           </div>

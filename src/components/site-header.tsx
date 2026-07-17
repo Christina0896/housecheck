@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { House, Radar, Search } from "lucide-react";
+import { ClipboardCheck, House, Radar, Search } from "lucide-react";
 
 export function SiteHeader() {
   return (
@@ -28,19 +28,26 @@ export function SiteHeader() {
             <Search aria-hidden="true" className="size-4" />
             Explore
           </Link>
+          <Link className="nav-link" href="/review">
+            <ClipboardCheck aria-hidden="true" className="size-4" />
+            Review
+          </Link>
           <Link className="nav-link" href="/how-it-works">
             <Radar aria-hidden="true" className="size-4" />
             How it works
           </Link>
         </nav>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-900/10 bg-white/70 px-3 py-1.5 text-xs font-semibold text-emerald-950 shadow-sm">
+        <Link
+          className="inline-flex items-center gap-2 rounded-full border border-violet-900/10 bg-white/70 px-3 py-1.5 text-xs font-semibold text-violet-950 shadow-sm transition hover:bg-white"
+          href="/review"
+        >
           <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-40" />
-            <span className="relative inline-flex size-2 rounded-full bg-emerald-600" />
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-violet-500 opacity-40" />
+            <span className="relative inline-flex size-2 rounded-full bg-violet-600" />
           </span>
-          Scraper ready
-        </div>
+          Approval on
+        </Link>
       </div>
     </header>
   );

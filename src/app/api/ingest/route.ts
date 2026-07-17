@@ -1,21 +1,28 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { slugify } from "@/lib/format";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const httpsUrlSchema = z
   .url()
   .refine((value) => new URL(value).protocol === "https:", "HTTPS URL required");
 
-const evidenceSchema = z.enum(["map-verified", "agent-stated", "estimated"]);
+const evidenceSchema = z.enum([
+  "buyer-verified",
+  "map-verified",
+  "agent-stated",
+  "estimated",
+]);
 const settingLabelSchema = z.enum([
+  "Woodland on property",
+  "Forest edge",
+  "Near forest",
+  "River frontage",
+  "Riverside",
   "Lakeside",
   "Near lake",
   "Seaside",
   "Near coast",
-  "Forest edge",
-  "Near forest",
-  "Riverside",
   "Countryside",
   "Village",
 ]);
@@ -71,15 +78,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json(
-      { error: "Database is not configured" },
-      { status: 503 },
-    );
-  }
-
   let input: z.infer<typeof ingestSchema>;
   try {
     input = ingestSchema.parse(await request.json());
@@ -93,16 +91,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  let supabase;
+  try {
+    supabase = getSupabaseServerClient();
+  } catch {
+    return NextResponse.json(
+      { error: "Database is not configured" },
+      { status: 503 },
+    );
+  }
 
   const { data: previous } = await supabase
     .from("properties")
-    .select("id, price, first_seen")
+    .select(
+      "id, price, first_seen, review_status, is_active, review_notes, boundary_evidence_path, reviewed_at, settings, land_acres, land_hectares, land_evidence",
+    )
     .eq("source_name", input.sourceName)
     .eq("source_id", input.sourceId)
     .maybeSingle();
+
+  const previousSettings = Array.isArray(previous?.settings)
+    ? previous.settings
+    : [];
+  const buyerVerifiedSettings = previousSettings.filter(
+    (setting) =>
+      typeof setting === "object" &&
+      setting !== null &&
+      "evidence" in setting &&
+      setting.evidence === "buyer-verified",
+  );
+  const buyerVerifiedLabels = new Set(
+    buyerVerifiedSettings.flatMap((setting) =>
+      typeof setting === "object" && setting !== null && "label" in setting
+        ? [String(setting.label)]
+        : [],
+    ),
+  );
+  const mergedSettings = [
+    ...buyerVerifiedSettings,
+    ...input.settings.filter(
+      (setting) => !buyerVerifiedLabels.has(setting.label),
+    ),
+  ];
+  const buyerVerifiedLand = previous?.land_evidence === "buyer-verified";
 
   const record = {
     source_id: input.sourceId,
@@ -118,10 +149,14 @@ export async function POST(request: NextRequest) {
     bathrooms: input.bathrooms,
     floor_area_sqm: input.floorAreaSqm,
     ber_rating: input.berRating,
-    land_acres: input.landAcres,
-    land_hectares: input.landHectares,
+    land_acres: buyerVerifiedLand ? previous?.land_acres : input.landAcres,
+    land_hectares: buyerVerifiedLand
+      ? previous?.land_hectares
+      : input.landHectares,
     land_size_approximate: input.landSizeApproximate,
-    land_evidence: input.landEvidence,
+    land_evidence: buyerVerifiedLand
+      ? previous?.land_evidence
+      : input.landEvidence,
     latitude: input.latitude,
     longitude: input.longitude,
     image_url: input.imageUrl,
@@ -131,19 +166,23 @@ export async function POST(request: NextRequest) {
     last_seen: input.lastSeen,
     is_new: !previous,
     price_changed: Boolean(previous && Number(previous.price) !== input.price),
-    settings: input.settings,
+    settings: mergedSettings,
     distances: input.distances,
     nearest_lake: input.nearestLake,
     nearest_forest: input.nearestForest,
     features: input.features,
     match_score: input.matchScore,
-    is_active: true,
+    review_status: previous?.review_status ?? "pending",
+    review_notes: previous?.review_notes ?? "",
+    boundary_evidence_path: previous?.boundary_evidence_path ?? null,
+    reviewed_at: previous?.reviewed_at ?? null,
+    is_active: previous?.is_active ?? true,
   };
 
   const { data, error } = await supabase
     .from("properties")
     .upsert(record, { onConflict: "source_name,source_id" })
-    .select("id, slug, price, price_changed")
+    .select("id, slug, price, price_changed, review_status")
     .single();
 
   if (error) {

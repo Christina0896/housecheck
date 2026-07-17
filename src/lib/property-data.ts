@@ -1,35 +1,42 @@
-import { createClient } from "@supabase/supabase-js";
 import { demoProperties } from "@/data/properties";
+import {
+  getSupabaseServerClient,
+  hasDatabaseConfig,
+} from "@/lib/supabase-server";
 import type { Property } from "@/lib/types";
 
-function hasDatabaseConfig(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-  );
-}
+export type PropertyFeed = {
+  properties: Property[];
+  mode: "demo" | "live";
+};
 
-export async function getProperties(): Promise<Property[]> {
-  if (!hasDatabaseConfig()) return demoProperties;
+export async function getPropertyFeed(): Promise<PropertyFeed> {
+  if (!hasDatabaseConfig()) {
+    return { properties: demoProperties, mode: "demo" };
+  }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
-
+  const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
     .from("properties")
     .select("*")
     .eq("is_active", true)
+    .eq("review_status", "approved")
     .order("match_score", { ascending: false });
 
-  if (error || !data?.length) {
-    console.error("Falling back to demo properties:", error?.message);
-    return demoProperties;
+  if (error) {
+    console.warn("Could not load approved properties:", error.message);
+    return { properties: [], mode: "live" };
   }
 
-  return data.map(databaseRowToProperty);
+  return {
+    properties: (data ?? []).map(databaseRowToProperty),
+    mode: "live",
+  };
+}
+
+export async function getProperties(): Promise<Property[]> {
+  const feed = await getPropertyFeed();
+  return feed.properties;
 }
 
 export async function getPropertyBySlug(
@@ -39,7 +46,7 @@ export async function getPropertyBySlug(
   return properties.find((property) => property.slug === slug);
 }
 
-function databaseRowToProperty(row: Record<string, unknown>): Property {
+export function databaseRowToProperty(row: Record<string, unknown>): Property {
   return {
     id: String(row.id),
     slug: String(row.slug),
@@ -76,5 +83,13 @@ function databaseRowToProperty(row: Record<string, unknown>): Property {
     nearestForest: row.nearest_forest ? String(row.nearest_forest) : null,
     features: (row.features ?? []) as string[],
     matchScore: Number(row.match_score),
+    reviewStatus: row.review_status
+      ? (String(row.review_status) as Property["reviewStatus"])
+      : undefined,
+    reviewNotes: row.review_notes ? String(row.review_notes) : "",
+    reviewedAt: row.reviewed_at ? String(row.reviewed_at) : null,
+    boundaryEvidencePath: row.boundary_evidence_path
+      ? String(row.boundary_evidence_path)
+      : null,
   };
 }

@@ -1,10 +1,15 @@
-import { CircleCheck, FileText, MapPin } from "lucide-react";
+import { CircleCheck, FileText, MapPin, ShieldCheck } from "lucide-react";
 import type { EvidenceLevel } from "@/lib/types";
 
 const evidenceContent: Record<
   EvidenceLevel,
   { label: string; className: string; icon: typeof CircleCheck }
 > = {
+  "buyer-verified": {
+    label: "Buyer verified",
+    className: "bg-violet-50 text-violet-800 ring-violet-700/15",
+    icon: ShieldCheck,
+  },
   "map-verified": {
     label: "Map checked",
     className: "bg-emerald-50 text-emerald-800 ring-emerald-700/15",

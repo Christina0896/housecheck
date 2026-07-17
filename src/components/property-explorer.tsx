@@ -21,17 +21,26 @@ import { formatCurrency } from "@/lib/format";
 import type { Property, SettingLabel } from "@/lib/types";
 
 const settingOptions: Array<{ label: SettingLabel; icon: typeof Waves }> = [
+  { label: "Woodland on property", icon: Trees },
+  { label: "Forest edge", icon: Trees },
+  { label: "Near forest", icon: Trees },
+  { label: "River frontage", icon: Waves },
+  { label: "Riverside", icon: Waves },
   { label: "Lakeside", icon: Waves },
   { label: "Near lake", icon: Waves },
   { label: "Seaside", icon: Waves },
   { label: "Near coast", icon: Waves },
-  { label: "Forest edge", icon: Trees },
-  { label: "Near forest", icon: Trees },
 ];
 
 type SortOption = "match" | "price-low" | "price-high" | "land-high" | "newest";
 
-export function PropertyExplorer({ properties }: { properties: Property[] }) {
+export function PropertyExplorer({
+  properties,
+  mode,
+}: {
+  properties: Property[];
+  mode: "demo" | "live";
+}) {
   const [query, setQuery] = useState("");
   const [county, setCounty] = useState("All counties");
   const [maxPrice, setMaxPrice] = useState("600000");
@@ -220,7 +229,7 @@ export function PropertyExplorer({ properties }: { properties: Property[] }) {
                 value={String(
                   properties.filter((item) =>
                     item.settings.some((setting) =>
-                      ["Lakeside", "Near lake", "Seaside", "Near coast"].includes(
+                      ["Lakeside", "Near lake", "Seaside", "Near coast", "River frontage", "Riverside"].includes(
                         setting.label,
                       ),
                     ),
@@ -233,10 +242,15 @@ export function PropertyExplorer({ properties }: { properties: Property[] }) {
                 value={String(properties.filter((item) => item.isNew).length)}
               />
             </div>
-            <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950 ring-1 ring-amber-900/10">
-              <strong>Demo mode:</strong> sample records are shown until Supabase and the
-              scheduled scraper are connected.
-            </p>
+            {mode === "demo" ? (
+              <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950 ring-1 ring-amber-900/10">
+                <strong>Demo mode:</strong> sample records are shown until Supabase is connected.
+              </p>
+            ) : (
+              <p className="mt-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-950 ring-1 ring-emerald-900/10">
+                <strong>Approval mode:</strong> only properties you approve in the review queue appear here.
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -406,7 +420,7 @@ export function PropertyExplorer({ properties }: { properties: Property[] }) {
             <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-emerald-800">
-                  Analysed properties
+                  Approved properties
                 </p>
                 <h2 className="mt-1 text-3xl font-black tracking-[-0.04em] text-stone-950">
                   {filteredProperties.length} matching homes
@@ -483,18 +497,31 @@ export function PropertyExplorer({ properties }: { properties: Property[] }) {
                     <Search aria-hidden="true" className="size-6" />
                   </span>
                   <h3 className="mt-4 text-xl font-black text-stone-950">
-                    No properties match
+                    {properties.length === 0 && mode === "live"
+                      ? "No approved properties yet"
+                      : "No properties match"}
                   </h3>
                   <p className="mt-2 max-w-sm text-sm leading-6 text-stone-600">
-                    Increase the price or distance, or remove one of the setting filters.
+                    {properties.length === 0 && mode === "live"
+                      ? "New imports remain private until you review and approve them. Open the review queue to publish the first property."
+                      : "Increase the price or distance, or remove one of the setting filters."}
                   </p>
-                  <button
-                    className="mt-5 rounded-xl bg-[#173f35] px-4 py-2.5 text-sm font-extrabold text-white"
-                    onClick={clearFilters}
-                    type="button"
-                  >
-                    Reset filters
-                  </button>
+                  {properties.length === 0 && mode === "live" ? (
+                    <Link
+                      className="mt-5 inline-flex rounded-xl bg-[#173f35] px-4 py-2.5 text-sm font-extrabold text-white"
+                      href="/review"
+                    >
+                      Open review queue
+                    </Link>
+                  ) : (
+                    <button
+                      className="mt-5 rounded-xl bg-[#173f35] px-4 py-2.5 text-sm font-extrabold text-white"
+                      onClick={clearFilters}
+                      type="button"
+                    >
+                      Reset filters
+                    </button>
+                  )}
                 </div>
               </div>
             )}

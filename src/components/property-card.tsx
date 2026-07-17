@@ -18,7 +18,10 @@ import { formatCurrency, formatDistance } from "@/lib/format";
 import type { Property } from "@/lib/types";
 
 function SettingIcon({ label }: { label: string }) {
-  if (label.toLowerCase().includes("forest")) {
+  if (
+    label.toLowerCase().includes("forest") ||
+    label.toLowerCase().includes("woodland")
+  ) {
     return <Trees aria-hidden="true" className="size-3.5" />;
   }
   if (

@@ -144,6 +144,24 @@ export default async function PropertyPage({
               </div>
             </div>
 
+            <div className="mt-5">
+              <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-stone-500">
+                Setting evidence
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {property.settings.map((setting) => (
+                  <span
+                    className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-2.5 py-2 text-xs font-extrabold text-stone-800"
+                    key={`${setting.label}-${setting.evidence}`}
+                    title={setting.detail}
+                  >
+                    {setting.label}
+                    <EvidenceBadge level={setting.evidence} />
+                  </span>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-auto pt-7">
               {property.sourceUrl ? (
                 <a
